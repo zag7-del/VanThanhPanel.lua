@@ -1,183 +1,146 @@
---Van Thanh Panel v1.0--
+-- Van Thanh Panel v1.16 (13/11/2025) - Based on Aurora ENG + Van Thanh Upgrade
+-- Code bởi: Van Thanh >/< | Tham khảo: egorware/aurora_but_eng.lua
+-- Features: Smooth Aimbot, Silent Aim, ESP Team Toggle, Tracer + Distance, FOV %, Config
+
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local runService = game:GetService("RunService")
-local userInputService = game:GetService("UserInputService")
 local players = game:GetService("Players")
-local lighting = game:GetService("Lighting")
-local replicatedStorage = game:GetService("ReplicatedStorage")
 local camera = workspace.CurrentCamera
-local weapons = replicatedStorage:WaitForChild("Weapons")
 local localPlayer = players.LocalPlayer
 local HttpService = game:GetService("HttpService")
+local userInputService = game:GetService("UserInputService")
+local replicatedStorage = game:GetService("ReplicatedStorage")
 
-
-local aimbot = {
-    Enabled = false,
-    TargetPart = "Head",
-    TeamCheck = false,
-    Smoothing = 0.1,
-    EnableFOV = false,
-    FOVRadius = 150,
-    HeadPriority = 50,
-    CircleSizePct = 100
+-- === CONFIG ===
+local config = {
+    aimbot = {
+        Enabled = false,
+        TeamCheck = true,
+        SilentAim = false,
+        Hitbox = "Head",
+        Smoothing = 0.15,
+        FOV = 150,
+        FOVVisible = true,
+        FOVSizePct = 100
+    },
+    esp = {
+        Enabled = false,
+        TeamESP = false,
+        Box = true,
+        Name = true,
+        Distance = true,
+        Tracer = true,
+        HealthBar = true
+    }
 }
 
-
-local function UpdatePartRatios()
-    local headPct = aimbot.HeadPriority
-    local remaining = 100 - headPct
-    aimbot.PartRatios = {
-        Head = headPct,
-        Torso = math.floor(remaining * 0.6),
-        LeftHand = math.floor(remaining * 0.2),
-        RightHand = remaining * 0.2
-    }
-end
-
-
-local esp = {Enabled = false}
-
-
+-- === FOV CIRCLE ===
 local fovCircle = Drawing.new("Circle")
-fovCircle.Visible = false
 fovCircle.Thickness = 2
-fovCircle.Radius = aimbot.FOVRadius * (aimbot.CircleSizePct / 100)
+fovCircle.Filled = false
 fovCircle.Transparency = 0.8
 fovCircle.Color = Color3.fromRGB(255, 0, 0)
-fovCircle.Filled = false
+fovCircle.Radius = config.aimbot.FOV * (config.aimbot.FOVSizePct / 100)
+fovCircle.Visible = config.aimbot.FOVVisible
 
+-- === ESP STORAGE ===
+local ESP = {}
 
-local ESPObjects = {}
-
-
-local function GetValidPart(player, partName)
-    local char = player.Character
-    if not char then return nil end
-
-    local part = nil
-    if partName == "Head" then
-        part = char:FindFirstChild("Head")
-    elseif partName == "Torso" then
-        part = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
-    elseif partName == "LeftHand" then
-        part = char:FindFirstChild("LeftHand") or char:FindFirstChild("Left Arm")
-    elseif partName == "RightHand" then
-        part = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
-    end
-
-    if part and part:IsA("BasePart") and part.Position then
-        return part
-    end
-    return nil
-end
-
-
-local function GetClosestPlayer()
-    UpdatePartRatios()
+-- === GET BEST TARGET (Aurora-style) ===
+local function GetBestTarget()
     local closest = nil
-    local shortestDist = math.huge
+    local closestDist = config.aimbot.FOV
     local origin = camera.CFrame.Position
 
     for _, player in pairs(players:GetPlayers()) do
         if player == localPlayer then continue end
+        if config.aimbot.TeamCheck and player.Team == localPlayer.Team then continue end
+
         local char = player.Character
-        if not char then continue end
-        if not char:FindFirstChild("HumanoidRootPart") then continue end
-        if not char:FindFirstChild("Humanoid") or char.Humanoid.Health <= 0 then continue end
-        if aimbot.TeamCheck and player.Team == localPlayer.Team then continue end
+        if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then continue end
+        if char.Humanoid.Health <= 0 then continue end
 
-        local parts = {
-            Head = GetValidPart(player, "Head"),
-            Torso = GetValidPart(player, "Torso"),
-            LeftHand = GetValidPart(player, "LeftHand"),
-            RightHand = GetValidPart(player, "RightHand")
-        }
+        local part = char:FindFirstChild(config.aimbot.Hitbox) or char.HumanoidRootPart
+        local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
+        if not onScreen then continue end
 
-        local selectedPart = nil
-        if aimbot.TargetPart ~= "Random" then
-            selectedPart = parts[aimbot.TargetPart]
-        else
-            local rand = math.random(1, 100)
-            local cum = 0
-            for name, ratio in pairs(aimbot.PartRatios) do
-                if parts[name] then
-                    cum = cum + ratio
-                    if rand <= cum then
-                        selectedPart = parts[name]
-                        break
-                    end
-                end
-            end
-        end
-
-        if not selectedPart then
-            selectedPart = char.HumanoidRootPart
-        end
-
-        if selectedPart and selectedPart.Position then
-            local dist = (selectedPart.Position - origin).Magnitude
-            if dist < shortestDist then
-                shortestDist = dist
-                closest = {Player = player, Part = selectedPart}
-            end
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - userInputService:GetMouseLocation()).Magnitude
+        if dist < closestDist then
+            closestDist = dist
+            closest = {Player = player, Part = part, Screen = screenPos}
         end
     end
     return closest
 end
 
-
+-- === AIMBOT LOOP (Smooth + Silent) ===
 runService.Heartbeat:Connect(function()
-    if not aimbot.Enabled then return end
-    local target = GetClosestPlayer()
-    if not target or not target.Part or not target.Part.Position then return end
+    if not config.aimbot.Enabled then return end
+    local target = GetBestTarget()
+    if not target then return end
 
     local targetPos = target.Part.Position
-    if aimbot.EnableFOV then
-        local screenPos, onScreen = camera:WorldToViewportPoint(targetPos)
-        if not onScreen then return end
-        local center = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y/2)
-        local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
-        if dist > aimbot.FOVRadius then return end
-    end
 
-    camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, targetPos), aimbot.Smoothing)
+    if config.aimbot.SilentAim then
+        -- Silent: Không di chuyển camera, chỉ bắn trúng
+        local mousePos = userInputService:GetMouseLocation()
+        local direction = (targetPos - camera.CFrame.Position).Unit
+        local lookAt = camera.CFrame.Position + direction * 1000
+        camera.CFrame = CFrame.new(camera.CFrame.Position, lookAt)
+    else
+        -- Smooth aim: Tâm di chuyển theo địch
+        camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, targetPos), config.aimbot.Smoothing)
+    end
 end)
 
-
+-- === ESP CREATE ===
 local function CreateESP(player)
-    if ESPObjects[player] then return end
+    if ESP[player] then return end
 
-    local group = {}
-    local box = Drawing.new("Square")
-    box.Thickness = 2; box.Filled = false; box.Color = Color3.fromRGB(255, 0, 0); box.Transparency = 1
+    local esp = {}
+    esp.Box = Drawing.new("Square")
+    esp.Box.Thickness = 2; esp.Box.Filled = false; esp.Box.Color = Color3.fromRGB(255, 0, 0); esp.Box.Transparency = 1
 
-    local name = Drawing.new("Text")
-    name.Size = 16; name.Font = 2; name.Color = Color3.fromRGB(255, 255, 255); name.Outline = true; name.Center = true
+    esp.Name = Drawing.new("Text")
+    esp.Name.Size = 14; esp.Name.Font = 2; esp.Name.Color = Color3.fromRGB(255, 255, 255); esp.Name.Outline = true; esp.Name.Center = true
 
-    local healthBar = Drawing.new("Line")
-    healthBar.Thickness = 3; healthBar.Color = Color3.fromRGB(0, 255, 0)
+    esp.Distance = Drawing.new("Text")
+    esp.Distance.Size = 13; esp.Distance.Font = 2; esp.Distance.Color = Color3.fromRGB(0, 255, 255); esp.Distance.Outline = true
 
-    local healthBG = Drawing.new("Line")
-    healthBG.Thickness = 3; healthBG.Color = Color3.fromRGB(0, 0, 0); healthBG.Transparency = 0.5
+    esp.Tracer = Drawing.new("Line")
+    esp.Tracer.Thickness = 1; esp.Tracer.Color = Color3.fromRGB(255, 255, 255); esp.Tracer.Transparency = 0.7
 
-    group.box = box; group.name = name; group.healthBar = healthBar; group.healthBG = healthBG
-    ESPObjects[player] = group
+    esp.HealthBar = Drawing.new("Line")
+    esp.HealthBar.Thickness = 3
+
+    esp.HealthBG = Drawing.new("Line")
+    esp.HealthBG.Thickness = 3; esp.HealthBG.Color = Color3.fromRGB(0, 0, 0); esp.HealthBG.Transparency = 0.5
+
+    ESP[player] = esp
 end
 
-
+-- === ESP UPDATE ===
 local function UpdateESP()
-    if not esp.Enabled then return end
+    if not config.esp.Enabled then return end
 
-    for player, group in pairs(ESPObjects) do
+    for player, drawings in pairs(ESP) do
         local char = player.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then
-            for _, obj in pairs(group) do obj.Visible = false end
+            for _, d in pairs(drawings) do d.Visible = false end
             continue
         end
 
         local root = char.HumanoidRootPart
         local hum = char.Humanoid
-        local head = GetValidPart(player, "Head") or root
+        local head = char:FindFirstChild("Head") or root
+        local isTeam = player.Team == localPlayer.Team
+
+        -- Team ESP Toggle
+        if not config.esp.TeamESP and isTeam then
+            for _, d in pairs(drawings) do d.Visible = false end
+            continue
+        end
+
         local vector, onScreen = camera:WorldToViewportPoint(root.Position)
         local headY = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1, 0)).Y
         local footY = camera:WorldToViewportPoint(root.Position - Vector3.new(0, 5, 0)).Y
@@ -185,48 +148,74 @@ local function UpdateESP()
         local width = height / 2
 
         if onScreen and height > 10 then
-            
-            group.box.Size = Vector2.new(width, height)
-            group.box.Position = Vector2.new(vector.X - width/2, vector.Y - height/2)
-            group.box.Visible = true
+            local color = isTeam and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
 
-            
-            group.name.Text = player.Name
-            group.name.Position = Vector2.new(vector.X, headY - 20)
-            group.name.Visible = true
+            -- Box
+            if config.esp.Box then
+                drawings.Box.Size = Vector2.new(width, height)
+                drawings.Box.Position = Vector2.new(vector.X - width/2, vector.Y - height/2)
+                drawings.Box.Color = color
+                drawings.Box.Visible = true
+            else
+                drawings.Box.Visible = false
+            end
 
-            
-            local healthPct = hum.Health / hum.MaxHealth
-            group.healthBar.From = Vector2.new(vector.X - width/2 - 5, footY)
-            group.healthBar.To = Vector2.new(vector.X - width/2 - 5, footY + height * healthPct)
-            group.healthBar.Color = Color3.fromRGB(255 * (1 - healthPct), 255 * healthPct, 0)
-            group.healthBar.Visible = true
+            -- Name
+            if config.esp.Name then
+                drawings.Name.Text = player.Name
+                drawings.Name.Position = Vector2.new(vector.X, headY - 20)
+                drawings.Name.Visible = true
+            else
+                drawings.Name.Visible = false
+            end
 
-            group.healthBG.From = Vector2.new(vector.X - width/2 - 5, footY)
-            group.healthBG.To = Vector2.new(vector.X - width/2 - 5, footY + height)
-            group.healthBG.Visible = true
+            -- Distance
+            if config.esp.Distance then
+                local dist = (root.Position - camera.CFrame.Position).Magnitude
+                drawings.Distance.Text = string.format("%.1fm", dist)
+                drawings.Distance.Position = Vector2.new(vector.X, footY + 5)
+                drawings.Distance.Visible = true
+            else
+                drawings.Distance.Visible = false
+            end
+
+            -- Tracer
+            if config.esp.Tracer then
+                drawings.Tracer.From = Vector2.new(camera.ViewportSize.X/2, camera.ViewportSize.Y)
+                drawings.Tracer.To = Vector2.new(vector.X, footY)
+                drawings.Tracer.Color = color
+                drawings.Tracer.Visible = true
+            else
+                drawings.Tracer.Visible = false
+            end
+
+            -- Health Bar
+            if config.esp.HealthBar then
+                local healthPct = hum.Health / hum.MaxHealth
+                drawings.HealthBar.From = Vector2.new(vector.X - width/2 - 5, footY)
+                drawings.HealthBar.To = Vector2.new(vector.X - width/2 - 5, footY + height * healthPct)
+                drawings.HealthBar.Color = Color3.fromRGB(255 * (1 - healthPct), 255 * healthPct, 0)
+                drawings.HealthBar.Visible = true
+
+                drawings.HealthBG.From = Vector2.new(vector.X - width/2 - 5, footY)
+                drawings.HealthBG.To = Vector2.new(vector.X - width/2 - 5, footY + height)
+                drawings.HealthBG.Visible = true
+            else
+                drawings.HealthBar.Visible = false
+                drawings.HealthBG.Visible = false
+            end
         else
-            for _, obj in pairs(group) do obj.Visible = false end
+            for _, d in pairs(drawings) do d.Visible = false end
         end
     end
 end
 
-
-local function ToggleShadows(remove)
-    for _, v in pairs(lighting:GetDescendants()) do
-        if v:IsA("PostEffect") or string.find(v.Name, "Shadow") then
-            v.Enabled = not remove
-        end
-    end
-end
-
-
-local configFile = "VanThanhPanel_Config.json"
+-- === CONFIG SAVE/LOAD ===
+local configFile = "VanThanhPanel_v16.json"
 local function SaveConfig()
-    local config = {aimbot = aimbot, esp = esp}
     if writefile then
         writefile(configFile, HttpService:JSONEncode(config))
-        Rayfield:Notify({Title = "Saved!", Content = "Config lưu file!", Duration = 2})
+        Rayfield:Notify({Title = "Saved!", Content = "Config đã lưu!", Duration = 2})
     else
         setclipboard(HttpService:JSONEncode(config))
         Rayfield:Notify({Title = "Copied!", Content = "Dán JSON để lưu!", Duration = 2})
@@ -236,73 +225,95 @@ end
 local function LoadConfig()
     if isfile and isfile(configFile) and readfile then
         local data = HttpService:JSONDecode(readfile(configFile))
-        for k, v in pairs(data.aimbot) do aimbot[k] = v end
-        esp.Enabled = data.esp.Enabled or false
-        fovCircle.Radius = aimbot.FOVRadius * (aimbot.CircleSizePct / 100)
-        Rayfield:Notify({Title = "Loaded!", Content = "Config OK!", Duration = 2})
+        for k, v in pairs(data) do
+            if config[k] then
+                for sk, sv in pairs(v) do
+                    if config[k][sk] ~= nil then
+                        config[k][sk] = sv
+                    end
+                end
+            end
+        end
+        -- Apply
+        fovCircle.Radius = config.aimbot.FOV * (config.aimbot.FOVSizePct / 100)
+        fovCircle.Visible = config.aimbot.FOVVisible
+        Rayfield:Notify({Title = "Loaded!", Content = "Config đã tải!", Duration = 2})
     end
 end
 
-
+-- === GUI ===
 local Window = Rayfield:CreateWindow({
-    Name = "Van Thanh Panel v1.15",
-    LoadingTitle = "Đang Load...",
-    LoadingSubtitle = "Code By Van Thanh >/<",
-    ConfigurationSaving = {Enabled = true, FolderName = "VanThanhPanel", FileName = "Config"}
+    Name = "Van Thanh Panel v1.16",
+    LoadingTitle = "Aurora ENG + Van Thanh",
+    LoadingSubtitle = "Smooth | Silent | ESP Team Toggle",
+    ConfigurationSaving = {Enabled = true, FolderName = "VanThanhPanel", FileName = "v16"}
 })
 
-local CombatTab = Window:CreateTab("Combat", 4483362458)
-local VisualsTab = Window:CreateTab("Visuals", 4483362458)
-local MiscTab = Window:CreateTab("Misc", 4483362458)
+local Combat = Window:CreateTab("Combat", 4483362458)
+local Visuals = Window:CreateTab("Visuals", 4483362458)
+local Misc = Window:CreateTab("Misc", 4483362458)
 local ConfigTab = Window:CreateTab("Config", 4483362458)
-local CreditsTab = Window:CreateTab("Credits", 4483362458)
+local Credits = Window:CreateTab("Credits", 4483362458)
 
+-- === COMBAT ===
+Combat:CreateToggle({Name = "Aimbot", Callback = function(v) config.aimbot.Enabled = v end})
+Combat:CreateToggle({Name = "Silent Aim", Callback = function(v) config.aimbot.SilentAim = v end})
+Combat:CreateToggle({Name = "Team Check", CurrentValue = true, Callback = function(v) config.aimbot.TeamCheck = v end})
+Combat:CreateDropdown({Name = "Hitbox", Options = {"Head", "Body", "Nearest"}, CurrentOption = {"Head"}, Callback = function(o) config.aimbot.Hitbox = o[1] end})
+Combat:CreateSlider({Name = "Smoothing", Range = {0.01, 1}, Increment = 0.01, CurrentValue = 0.15, Callback = function(v) config.aimbot.Smoothing = v end})
+Combat:CreateSlider({Name = "FOV", Range = {50, 500}, Increment = 10, CurrentValue = 150, Callback = function(v) config.aimbot.FOV = v; fovCircle.Radius = v * (config.aimbot.FOVSizePct / 100) end})
+Combat:CreateToggle({Name = "FOV Circle", CurrentValue = true, Callback = function(v) config.aimbot.FOVVisible = v; fovCircle.Visible = v end})
+Combat:CreateSlider({Name = "FOV Size %", Range = {50, 200}, Increment = 5, CurrentValue = 100, Callback = function(v) config.aimbot.FOVSizePct = v; fovCircle.Radius = config.aimbot.FOV * (v / 100) end})
 
-CombatTab:CreateToggle({Name = "Aimbot", Callback = function(v) aimbot.Enabled = v end})
-CombatTab:CreateDropdown({Name = "Target", Options = {"Head", "Torso", "LeftHand", "RightHand", "Random"}, CurrentOption = {"Head"}, Callback = function(o) aimbot.TargetPart = o[1] end})
-CombatTab:CreateSlider({Name = "Head Priority %", Range = {0,100}, Increment = 5, CurrentValue = 50, Callback = function(v) aimbot.HeadPriority = v end})
-CombatTab:CreateToggle({Name = "Team Check", Callback = function(v) aimbot.TeamCheck = v end})
-CombatTab:CreateSlider({Name = "Smoothing", Range = {0,1}, Increment = 0.05, CurrentValue = 0.1, Callback = function(v) aimbot.Smoothing = v end})
+-- === VISUALS ===
+Visuals:CreateToggle({Name = "ESP", Callback = function(v) config.esp.Enabled = v end})
+Visuals:CreateToggle({Name = "ESP Đồng Đội", CurrentValue = false, Callback = function(v) config.esp.TeamESP = v end})
+Visuals:CreateToggle({Name = "Box", CurrentValue = true, Callback = function(v) config.esp.Box = v end})
+Visuals:CreateToggle({Name = "Name", CurrentValue = true, Callback = function(v) config.esp.Name = v end})
+Visuals:CreateToggle({Name = "Distance", CurrentValue = true, Callback = function(v) config.esp.Distance = v end})
+Visuals:CreateToggle({Name = "Tracer", CurrentValue = true, Callback = function(v) config.esp.Tracer = v end})
+Visuals:CreateToggle({Name = "Health Bar", CurrentValue = true, Callback = function(v) config.esp.HealthBar = v end})
 
-
-VisualsTab:CreateToggle({Name = "ESP", Callback = function(v) 
-    esp.Enabled = v
-    if v then
-        for _, p in pairs(players:GetPlayers()) do
-            if p ~= localPlayer then CreateESP(p) end
-        end
-    else
-        for _, g in pairs(ESPObjects) do for _, o in pairs(g) do o:Remove() end end
-        ESPObjects = {}
-    end
+-- === MISC ===
+Misc:CreateButton({Name = "No Recoil", Callback = function() 
+    for _, w in pairs(replicatedStorage.Weapons:GetChildren()) do 
+        if w:FindFirstChild("Recoil") then w.Recoil.Value = 0 end 
+    end 
 end})
-VisualsTab:CreateToggle({Name = "FOV Circle", Callback = function(v) aimbot.EnableFOV = v; fovCircle.Visible = v end})
-VisualsTab:CreateSlider({Name = "Game FOV %", Range = {50,200}, Increment = 5, CurrentValue = 100, Callback = function(v) camera.FieldOfView = 70 * (v/100) end})
-VisualsTab:CreateSlider({Name = "Circle Size %", Range = {50,200}, Increment = 5, CurrentValue = 100, Callback = function(v) aimbot.CircleSizePct = v; fovCircle.Radius = aimbot.FOVRadius * (v/100) end})
 
--- Misc
-MiscTab:CreateButton({Name = "No Recoil", Callback = function() for _, w in pairs(weapons:GetChildren()) do if w:FindFirstChild("Recoil") then w.Recoil.Value = 0 end end end})
-MiscTab:CreateButton({Name = "Inf Ammo", Callback = function() spawn(function() while wait(0.1) do for _, w in pairs(weapons:GetChildren()) do if w:FindFirstChild("Ammo") then w.Ammo.Value = 999 end end end end) end})
-MiscTab:CreateToggle({Name = "Remove Shadows", Callback = function(v) ToggleShadows(v) end})
-
-
+-- === CONFIG ===
 ConfigTab:CreateButton({Name = "Save Config", Callback = SaveConfig})
 ConfigTab:CreateButton({Name = "Load Config", Callback = LoadConfig})
 
+-- === CREDITS ===
+Credits:CreateLabel("Code bởi: Van Thanh >/<")
+Credits:CreateLabel("Dựa trên: egorware/aurora_but_eng.lua")
+Credits:CreateLabel("Zalo: 0392236290 | Discord: vthanh20th7")
 
-CreditsTab:CreateLabel("Code bởi: Van Thanh >/<")
-CreditsTab:CreateLabel("v1.15 - Fixed All Spawn Errors")
-CreditsTab:CreateLabel("Zalo: 0392236290")
-
-
+-- === LOOPS ===
 runService.RenderStepped:Connect(UpdateESP)
 runService.RenderStepped:Connect(function()
-    if aimbot.EnableFOV and fovCircle.Visible then
+    if config.aimbot.FOVVisible then
         fovCircle.Position = userInputService:GetMouseLocation()
     end
 end)
 
-players.PlayerAdded:Connect(function(p) if esp.Enabled and p ~= localPlayer then CreateESP(p) end end)
-players.PlayerRemoving:Connect(function(p) if ESPObjects[p] then for _, o in pairs(ESPObjects[p]) do o:Remove() end; ESPObjects[p] = nil end end)
+players.PlayerAdded:Connect(function(p)
+    if config.esp.Enabled and p ~= localPlayer then
+        CreateESP(p)
+    end
+end)
 
-print("Van Thanh Panel v1.0! | Wish you a fun and relaxing game. Thank you very much!")
+players.PlayerRemoving:Connect(function(p)
+    if ESP[p] then
+        for _, d in pairs(ESP[p]) do d:Remove() end
+        ESP[p] = nil
+    end
+end)
+
+-- Auto create ESP
+for _, p in pairs(players:GetPlayers()) do
+    if p ~= localPlayer then CreateESP(p) end
+end
+
+print("Van Thanh Panel v1.16 Loaded – Aurora ENG Base + Full Upgrade!")
