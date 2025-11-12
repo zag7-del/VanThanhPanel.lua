@@ -1,6 +1,6 @@
--- Van Thanh Panel v1.16 (13/11/2025) - Based on Aurora ENG + Van Thanh Upgrade
--- Code bởi: Van Thanh >/< | Tham khảo: egorware/aurora_but_eng.lua
--- Features: Smooth Aimbot, Silent Aim, ESP Team Toggle, Tracer + Distance, FOV %, Config
+-- Van Thanh Panel v1.17 (13/11/2025) - Hold-To-Aim + Only Enemy
+-- Code bởi: Van Thanh >/< | Dựa Aurora ENG + Van Thanh Fix
+-- Features: Hold Mouse1 to Aim, Only Enemy, Silent Aim, ESP Team Toggle, Config
 
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local runService = game:GetService("RunService")
@@ -14,9 +14,9 @@ local replicatedStorage = game:GetService("ReplicatedStorage")
 -- === CONFIG ===
 local config = {
     aimbot = {
-        Enabled = false,
-        TeamCheck = true,
-        SilentAim = false,
+        Enabled = true,
+        HoldToAim = true,        -- Chỉ aim khi giữ chuột trái
+        SilentAim = false,       -- Bắn trúng dù tâm không nhích
         Hitbox = "Head",
         Smoothing = 0.15,
         FOV = 150,
@@ -24,8 +24,8 @@ local config = {
         FOVSizePct = 100
     },
     esp = {
-        Enabled = false,
-        TeamESP = false,
+        Enabled = true,
+        TeamESP = false,         -- Bật để thấy đồng đội
         Box = true,
         Name = true,
         Distance = true,
@@ -43,18 +43,30 @@ fovCircle.Color = Color3.fromRGB(255, 0, 0)
 fovCircle.Radius = config.aimbot.FOV * (config.aimbot.FOVSizePct / 100)
 fovCircle.Visible = config.aimbot.FOVVisible
 
--- === ESP STORAGE ===
-local ESP = {}
+-- === INPUT & STATE ===
+local mouseDown = false
+userInputService.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        mouseDown = true
+    end
+end)
+userInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        mouseDown = false
+    end
+end)
 
--- === GET BEST TARGET (Aurora-style) ===
-local function GetBestTarget()
+-- === GET BEST ENEMY (ONLY) ===
+local function GetBestEnemy()
+    if not config.aimbot.Enabled or (config.aimbot.HoldToAim and not mouseDown) then return nil end
+
     local closest = nil
     local closestDist = config.aimbot.FOV
     local origin = camera.CFrame.Position
 
     for _, player in pairs(players:GetPlayers()) do
         if player == localPlayer then continue end
-        if config.aimbot.TeamCheck and player.Team == localPlayer.Team then continue end
+        if player.Team == localPlayer.Team then continue end  -- CHỈ ĐỊCH
 
         local char = player.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then continue end
@@ -64,7 +76,8 @@ local function GetBestTarget()
         local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
         if not onScreen then continue end
 
-        local dist = (Vector2.new(screenPos.X, screenPos.Y) - userInputService:GetMouseLocation()).Magnitude
+        local mousePos = userInputService:GetMouseLocation()
+        local dist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
         if dist < closestDist then
             closestDist = dist
             closest = {Player = player, Part = part, Screen = screenPos}
@@ -73,48 +86,47 @@ local function GetBestTarget()
     return closest
 end
 
--- === AIMBOT LOOP (Smooth + Silent) ===
+-- === AIMBOT LOOP (Hold + Silent) ===
 runService.Heartbeat:Connect(function()
-    if not config.aimbot.Enabled then return end
-    local target = GetBestTarget()
+    local target = GetBestEnemy()
     if not target then return end
 
     local targetPos = target.Part.Position
 
     if config.aimbot.SilentAim then
-        -- Silent: Không di chuyển camera, chỉ bắn trúng
-        local mousePos = userInputService:GetMouseLocation()
+        -- Silent: Bắn trúng, tâm không nhích
         local direction = (targetPos - camera.CFrame.Position).Unit
         local lookAt = camera.CFrame.Position + direction * 1000
         camera.CFrame = CFrame.new(camera.CFrame.Position, lookAt)
     else
-        -- Smooth aim: Tâm di chuyển theo địch
+        -- Smooth aim: Tâm di chuyển mượt khi giữ chuột
         camera.CFrame = camera.CFrame:Lerp(CFrame.lookAt(camera.CFrame.Position, targetPos), config.aimbot.Smoothing)
     end
 end)
 
 -- === ESP CREATE ===
+local ESP = {}
 local function CreateESP(player)
     if ESP[player] then return end
 
     local esp = {}
     esp.Box = Drawing.new("Square")
-    esp.Box.Thickness = 2; esp.Box.Filled = false; esp.Box.Color = Color3.fromRGB(255, 0, 0); esp.Box.Transparency = 1
+    esp.Box.Thickness = 2; esp.Box.Filled = false; esp.Box.Transparency = 1
 
     esp.Name = Drawing.new("Text")
-    esp.Name.Size = 14; esp.Name.Font = 2; esp.Name.Color = Color3.fromRGB(255, 255, 255); esp.Name.Outline = true; esp.Name.Center = true
+    esp.Name.Size = 14; esp.Name.Font = 2; esp.Name.Outline = true; esp.Name.Center = true
 
     esp.Distance = Drawing.new("Text")
-    esp.Distance.Size = 13; esp.Distance.Font = 2; esp.Distance.Color = Color3.fromRGB(0, 255, 255); esp.Distance.Outline = true
+    esp.Distance.Size = 13; esp.Distance.Font = 2; esp.Distance.Outline = true
 
     esp.Tracer = Drawing.new("Line")
-    esp.Tracer.Thickness = 1; esp.Tracer.Color = Color3.fromRGB(255, 255, 255); esp.Tracer.Transparency = 0.7
+    esp.Tracer.Thickness = 1; esp.Tracer.Transparency = 0.7
 
     esp.HealthBar = Drawing.new("Line")
     esp.HealthBar.Thickness = 3
 
     esp.HealthBG = Drawing.new("Line")
-    esp.HealthBG.Thickness = 3; esp.HealthBG.Color = Color3.fromRGB(0, 0, 0); esp.HealthBG.Transparency = 0.5
+    esp.HealthBG.Thickness = 3; esp.HealthBG.Transparency = 0.5
 
     ESP[player] = esp
 end
@@ -130,26 +142,24 @@ local function UpdateESP()
             continue
         end
 
-        local root = char.HumanoidRootPart
-        local hum = char.Humanoid
-        local head = char:FindFirstChild("Head") or root
         local isTeam = player.Team == localPlayer.Team
-
-        -- Team ESP Toggle
         if not config.esp.TeamESP and isTeam then
             for _, d in pairs(drawings) do d.Visible = false end
             continue
         end
 
+        local root = char.HumanoidRootPart
+        local hum = char.Humanoid
+        local head = char:FindFirstChild("Head") or root
         local vector, onScreen = camera:WorldToViewportPoint(root.Position)
         local headY = camera:WorldToViewportPoint(head.Position + Vector3.new(0, 1, 0)).Y
         local footY = camera:WorldToViewportPoint(root.Position - Vector3.new(0, 5, 0)).Y
         local height = math.abs(headY - footY)
         local width = height / 2
 
-        if onScreen and height > 10 then
-            local color = isTeam and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
+        local color = isTeam and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0)
 
+        if onScreen and height > 10 then
             -- Box
             if config.esp.Box then
                 drawings.Box.Size = Vector2.new(width, height)
@@ -189,12 +199,12 @@ local function UpdateESP()
                 drawings.Tracer.Visible = false
             end
 
-            -- Health Bar
+            -- Health
             if config.esp.HealthBar then
-                local healthPct = hum.Health / hum.MaxHealth
+                local hp = hum.Health / hum.MaxHealth
                 drawings.HealthBar.From = Vector2.new(vector.X - width/2 - 5, footY)
-                drawings.HealthBar.To = Vector2.new(vector.X - width/2 - 5, footY + height * healthPct)
-                drawings.HealthBar.Color = Color3.fromRGB(255 * (1 - healthPct), 255 * healthPct, 0)
+                drawings.HealthBar.To = Vector2.new(vector.X - width/2 - 5, footY + height * hp)
+                drawings.HealthBar.Color = Color3.fromRGB(255 * (1 - hp), 255 * hp, 0)
                 drawings.HealthBar.Visible = true
 
                 drawings.HealthBG.From = Vector2.new(vector.X - width/2 - 5, footY)
@@ -211,7 +221,7 @@ local function UpdateESP()
 end
 
 -- === CONFIG SAVE/LOAD ===
-local configFile = "VanThanhPanel_v16.json"
+local configFile = "VanThanhPanel_v17.json"
 local function SaveConfig()
     if writefile then
         writefile(configFile, HttpService:JSONEncode(config))
@@ -228,13 +238,10 @@ local function LoadConfig()
         for k, v in pairs(data) do
             if config[k] then
                 for sk, sv in pairs(v) do
-                    if config[k][sk] ~= nil then
-                        config[k][sk] = sv
-                    end
+                    if config[k][sk] ~= nil then config[k][sk] = sv end
                 end
             end
         end
-        -- Apply
         fovCircle.Radius = config.aimbot.FOV * (config.aimbot.FOVSizePct / 100)
         fovCircle.Visible = config.aimbot.FOVVisible
         Rayfield:Notify({Title = "Loaded!", Content = "Config đã tải!", Duration = 2})
@@ -243,10 +250,10 @@ end
 
 -- === GUI ===
 local Window = Rayfield:CreateWindow({
-    Name = "Van Thanh Panel v1.16",
-    LoadingTitle = "Aurora ENG + Van Thanh",
-    LoadingSubtitle = "Smooth | Silent | ESP Team Toggle",
-    ConfigurationSaving = {Enabled = true, FolderName = "VanThanhPanel", FileName = "v16"}
+    Name = "Van Thanh Panel v1.17",
+    LoadingTitle = "Hold-To-Aim | Only Enemy",
+    LoadingSubtitle = "Van Thanh >/<",
+    ConfigurationSaving = {Enabled = true, FolderName = "VanThanhPanel", FileName = "v17"}
 })
 
 local Combat = Window:CreateTab("Combat", 4483362458)
@@ -256,9 +263,8 @@ local ConfigTab = Window:CreateTab("Config", 4483362458)
 local Credits = Window:CreateTab("Credits", 4483362458)
 
 -- === COMBAT ===
-Combat:CreateToggle({Name = "Aimbot", Callback = function(v) config.aimbot.Enabled = v end})
+Combat:CreateToggle({Name = "Aimbot (Hold LMB)", CurrentValue = true, Callback = function(v) config.aimbot.Enabled = v end})
 Combat:CreateToggle({Name = "Silent Aim", Callback = function(v) config.aimbot.SilentAim = v end})
-Combat:CreateToggle({Name = "Team Check", CurrentValue = true, Callback = function(v) config.aimbot.TeamCheck = v end})
 Combat:CreateDropdown({Name = "Hitbox", Options = {"Head", "Body", "Nearest"}, CurrentOption = {"Head"}, Callback = function(o) config.aimbot.Hitbox = o[1] end})
 Combat:CreateSlider({Name = "Smoothing", Range = {0.01, 1}, Increment = 0.01, CurrentValue = 0.15, Callback = function(v) config.aimbot.Smoothing = v end})
 Combat:CreateSlider({Name = "FOV", Range = {50, 500}, Increment = 10, CurrentValue = 150, Callback = function(v) config.aimbot.FOV = v; fovCircle.Radius = v * (config.aimbot.FOVSizePct / 100) end})
@@ -266,7 +272,7 @@ Combat:CreateToggle({Name = "FOV Circle", CurrentValue = true, Callback = functi
 Combat:CreateSlider({Name = "FOV Size %", Range = {50, 200}, Increment = 5, CurrentValue = 100, Callback = function(v) config.aimbot.FOVSizePct = v; fovCircle.Radius = config.aimbot.FOV * (v / 100) end})
 
 -- === VISUALS ===
-Visuals:CreateToggle({Name = "ESP", Callback = function(v) config.esp.Enabled = v end})
+Visuals:CreateToggle({Name = "ESP", CurrentValue = true, Callback = function(v) config.esp.Enabled = v end})
 Visuals:CreateToggle({Name = "ESP Đồng Đội", CurrentValue = false, Callback = function(v) config.esp.TeamESP = v end})
 Visuals:CreateToggle({Name = "Box", CurrentValue = true, Callback = function(v) config.esp.Box = v end})
 Visuals:CreateToggle({Name = "Name", CurrentValue = true, Callback = function(v) config.esp.Name = v end})
@@ -287,8 +293,8 @@ ConfigTab:CreateButton({Name = "Load Config", Callback = LoadConfig})
 
 -- === CREDITS ===
 Credits:CreateLabel("Code bởi: Van Thanh >/<")
-Credits:CreateLabel("Dựa trên: egorware/aurora_but_eng.lua")
-Credits:CreateLabel("Zalo: 0392236290 | Discord: vthanh20th7")
+Credits:CreateLabel("v1.17 - Hold-To-Aim | Only Enemy")
+Credits:CreateLabel("Zalo: 0392236290")
 
 -- === LOOPS ===
 runService.RenderStepped:Connect(UpdateESP)
@@ -298,10 +304,13 @@ runService.RenderStepped:Connect(function()
     end
 end)
 
+-- Auto ESP
+for _, p in pairs(players:GetPlayers()) do
+    if p ~= localPlayer then CreateESP(p) end
+end
+
 players.PlayerAdded:Connect(function(p)
-    if config.esp.Enabled and p ~= localPlayer then
-        CreateESP(p)
-    end
+    if config.esp.Enabled and p ~= localPlayer then CreateESP(p) end
 end)
 
 players.PlayerRemoving:Connect(function(p)
@@ -311,9 +320,4 @@ players.PlayerRemoving:Connect(function(p)
     end
 end)
 
--- Auto create ESP
-for _, p in pairs(players:GetPlayers()) do
-    if p ~= localPlayer then CreateESP(p) end
-end
-
-print("Van Thanh Panel v1.16 Loaded – Aurora ENG Base + Full Upgrade!")
+print("Van Thanh Panel v1.17 Loaded – Hold LMB to Aim, Only Enemy!")
