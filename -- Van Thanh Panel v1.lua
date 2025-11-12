@@ -37,44 +37,6 @@ end
 local esp = {Enabled = false}
 
 
-ives = {
-        {Name = "Default", ID = "0x0"},
-        {Name = "Karambit", ID = "0x33126998"},
-        {Name = "Butterfly", ID = "0x17010670"},
-        {Name = "M9 Bayonet", ID = "0x33123b5c"},
-        {Name = "Gut Knife", ID = "0x12345678"},
-        {Name = "Flip Knife", ID = "0x87654321"},
-        {Name = "Huntsman", ID = "0xabcdef12"},
-        {Name = "Falchion", ID = "0x11223344"},
-        {Name = "Bowie", ID = "0x55667788"},
-        {Name = "Shadow Daggers", ID = "0x99aabbcc"}
-    },
-    Gloves = {
-        {Name = "Default", ID = "0x0"},
-        {Name = "Sporty", ID = "0x11122233"},
-        {Name = "Hydra", ID = "0x44455566"},
-        {Name = "Moto", ID = "0x77788899"},
-        {Name = "Specialist", ID = "0x00011122"},
-        {Name = "Bloodhound", ID = "0x33344455"},
-        {Name = "Driver", ID = "0x66677788"},
-        {Name = "Handwraps", ID = "0x99900011"},
-        {Name = "Motorcycle", ID = "0x22233344"},
-        {Name = "Specialist Gloves", ID = "0x55566677"}
-    },
-    Weapons = {
-        {Name = "Default", ID = "0x0"},
-        {Name = "AK47 Fire Serpent", ID = "0x33126998"},
-        {Name = "AWP Dragon Lore", ID = "0x17010670"},
-        {Name = "M4A4 Howl", ID = "0x33123b5c"},
-        {Name = "Glock Fade", ID = "0x12345678"},
-        {Name = "AK47 Redline", ID = "0x87654321"},
-        {Name = "AWP Asiimov", ID = "0xabcdef12"},
-        {Name = "M4A1-S Hyperbeast", ID = "0x11223344"},
-        {Name = "USP-S Orion", ID = "0x55667788"},
-        {Name = "P250 Muertos", ID = "0x99aabbcc"}
-    }
-
-
 local fovCircle = Drawing.new("Circle")
 fovCircle.Visible = false
 fovCircle.Thickness = 2
@@ -209,28 +171,6 @@ local function UpdateESP()
         end
     end
 end
-
-
-local function ApplyAuroraSkin(category, skinName)
-    local remotes = replicatedStorage:WaitForChild("Remotes")
-    
-    local skinID = 0
-    for _, skin in pairs(auroraSkins[category]) do
-        if skin.Name == skinName then skinID = skin.ID; break end
-    end
-    
-    if skinID ~= 0 then
-        if category == "Knives" then
-            remotes:WaitForChild("ChangeKnife"):FireServer(skinID)
-        elseif category == "Gloves" then
-            remotes:WaitForChild("ChangeGlove"):FireServer(skinID)
-        elseif category == "Weapons" then
-            remotes:WaitForChild("ChangeWeapon"):FireServer(skinID)
-        end
-        Rayfield:Notify({Title = "Applied!", Content = skinName .. " (" .. category .. ")", Duration = 2})
-    end
-end
-
 
 local function ToggleShadows(remove)
     for _, v in pairs(lighting:GetDescendants()) do
@@ -426,5 +366,6 @@ runService.RenderStepped:Connect(function()
     end
 end)
 players.PlayerRemoving:Connect(function(p) if ESPObjects[p] then for _, obj in pairs(ESPObjects[p]) do obj:Remove() end; ESPObjects[p] = nil end end)
+
 
 print("Van Thanh Panel v1.0 Loaded! Wish you a fun and relaxing game. Thank you very much!>/<")
