@@ -1,4 +1,4 @@
--- Van Thanh Panel v1.18 (24/11/2025) - No Recoil Toggle + Keybinds
+-- Van Thanh Panel v1.19 (24/11/2025) - No Recoil Fix + Keybinds
 -- Code bởi: Van Thanh >/< | Dựa Aurora ENG + Van Thanh Fix
 -- Features: Keybinds, Hold Mouse1 to Aim, Only Enemy, Silent Aim, ESP Team Toggle, Config
 
@@ -22,7 +22,7 @@ local config = {
         FOV = 150,
         FOVVisible = true,
         FOVSizePct = 100,
-        Keybind = Enum.KeyCode.R -- KEYBIND MỚI
+        Keybind = Enum.KeyCode.R 
     },
     esp = {
         Enabled = true,
@@ -32,16 +32,19 @@ local config = {
         Distance = true,
         Tracer = true,
         HealthBar = true,
-        Keybind = Enum.KeyCode.T -- KEYBIND MỚI
+        Keybind = Enum.KeyCode.T
     },
-    misc = { -- THÊM CONFIG CHO MISC
+    misc = { 
         NoRecoil = false,
-        NoRecoilKeybind = Enum.KeyCode.F -- KEYBIND MỚI
+        NoRecoilKeybind = Enum.KeyCode.F 
     },
-    menu = { -- CONFIG CHO MENU
+    menu = { 
         Keybind = Enum.KeyCode.RightShift
     }
 }
+
+-- Mảng theo dõi các kết nối Recoil để tránh rò rỉ bộ nhớ
+local recoilConnections = {}
 
 -- === FOV CIRCLE ===
 local fovCircle = Drawing.new("Circle")
@@ -69,8 +72,6 @@ userInputService.InputBegan:Connect(function(input)
         -- Aimbot Toggle
         if input.KeyCode == config.aimbot.Keybind then
             config.aimbot.Enabled = not config.aimbot.Enabled
-            -- Cập nhật GUI (nếu Rayfield hỗ trợ)
-            -- (Rayfield không hỗ trợ cập nhật toggle từ ngoài, cần chỉnh sửa trong Rayfield nếu muốn)
             Rayfield:Notify({Title = "Aimbot Keybind", Content = "Aimbot: " .. (config.aimbot.Enabled and "ON" or "OFF"), Duration = 1})
         end
         
@@ -83,8 +84,15 @@ userInputService.InputBegan:Connect(function(input)
         -- No Recoil Toggle
         if input.KeyCode == config.misc.NoRecoilKeybind then
             config.misc.NoRecoil = not config.misc.NoRecoil
+            -- Áp dụng ngay lập tức
             if config.misc.NoRecoil and localPlayer.Character then
                 CheckAndApplyRecoil(localPlayer.Character)
+            else
+                -- Ngắt kết nối khi tắt để tránh lỗi
+                for tool, conn in pairs(recoilConnections) do
+                    conn:Disconnect()
+                    recoilConnections[tool] = nil
+                end
             end
             Rayfield:Notify({Title = "No Recoil Keybind", Content = "No Recoil: " .. (config.misc.NoRecoil and "ON" or "OFF"), Duration = 1})
         end
@@ -103,7 +111,7 @@ local function GetBestEnemy()
     local closest = nil
     local closestDist = config.aimbot.FOV
     local origin = camera.CFrame.Position
-    local mousePos = userInputService:GetMouseLocation() -- Lấy ở ngoài vòng lặp
+    local mousePos = userInputService:GetMouseLocation() 
 
     for _, player in pairs(players:GetPlayers()) do
         if player == localPlayer then continue end
@@ -143,7 +151,7 @@ local function GetBestEnemy()
             part = bestPart
         end
 
-        if not part then continue end -- Bỏ qua nếu không tìm thấy bộ phận hợp lệ
+        if not part then continue end 
         
         local screenPos, onScreen = camera:WorldToViewportPoint(part.Position)
         if not onScreen then continue end
@@ -175,20 +183,44 @@ runService.Heartbeat:Connect(function()
     end
 end)
 
--- === NO RECOIL LOGIC (VĨNH VIỄN) ===
+-- === NO RECOIL LOGIC (VĨNH VIỄN & KHÓA GIÁ TRỊ) ===
 local function ApplyNoRecoil(tool)
-    if config.misc.NoRecoil and tool and tool:IsA("Tool") and tool:FindFirstChild("Recoil") then
-        tool.Recoil.Value = 0
+    if not tool or not tool:IsA("Tool") or recoilConnections[tool] then return end -- Đã có kết nối
+
+    local recoilValue = tool:FindFirstChild("Recoil")
+    if recoilValue and (recoilValue:IsA("NumberValue") or recoilValue:IsA("IntValue") or recoilValue:IsA("Vector3Value")) then
+        
+        -- Hàm khóa giá trị Recoil
+        local function lockRecoil()
+            if config.misc.NoRecoil and recoilValue.Value ~= 0 then
+                recoilValue.Value = 0
+            end
+        end
+
+        -- Thiết lập ngay lập tức
+        lockRecoil()
+
+        -- Khóa giá trị bằng cách lắng nghe sự thay đổi
+        local conn = recoilValue:GetPropertyChangedSignal("Value"):Connect(lockRecoil)
+        recoilConnections[tool] = conn -- Lưu lại kết nối
+        
+        -- Dọn dẹp kết nối khi vũ khí bị xóa
+        tool.AncestryChanged:Connect(function()
+            if not tool.Parent and recoilConnections[tool] then
+                recoilConnections[tool]:Disconnect()
+                recoilConnections[tool] = nil
+            end
+        end)
     end
 end
 
 local function CheckAndApplyRecoil(char)
-    if not char then return end
+    if not config.misc.NoRecoil or not char then return end
 
-    -- Áp dụng cho các vũ khí đã có trong Backpack và tay
     local backpack = localPlayer:FindFirstChild("Backpack")
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     
+    -- 1. Áp dụng cho các vũ khí đã có sẵn
     if backpack then
         for _, tool in pairs(backpack:GetChildren()) do
             ApplyNoRecoil(tool)
@@ -199,26 +231,20 @@ local function CheckAndApplyRecoil(char)
         ApplyNoRecoil(humanoid.EquippedTool)
     end
     
-    -- Lắng nghe khi nhặt/chuyển vũ khí
-    local function connectTool(tool)
-        ApplyNoRecoil(tool)
-        tool.ChildAdded:Connect(function(child)
-            if child.Name == "Recoil" then
-                ApplyNoRecoil(tool)
-            end
-        end)
-    end
-
+    -- 2. Lắng nghe khi nhặt/chuyển vũ khí
+    
+    -- Khi vũ khí mới xuất hiện trong nhân vật (Equipped)
     char.ChildAdded:Connect(function(child)
         if child:IsA("Tool") then
-            connectTool(child)
+            ApplyNoRecoil(child)
         end
     end)
     
+    -- Khi vũ khí mới xuất hiện trong Backpack (Nhặt)
     if backpack then
         backpack.ChildAdded:Connect(function(child)
             if child:IsA("Tool") then
-                connectTool(child)
+                ApplyNoRecoil(child)
             end
         end)
     end
@@ -243,7 +269,7 @@ local function CreateESP(player)
     esp.Name.Size = 14; esp.Name.Font = 2; esp.Name.Outline = true; esp.Name.Center = true
 
     esp.Distance = Drawing.new("Text")
-    esp.Distance.Size = 13; esp.Distance.Font = 2; esp.Distance.Outline = true
+    esp.Distance.Size = 13; esp.Distance.Font = 2; esp.Name.Outline = true
 
     esp.Tracer = Drawing.new("Line")
     esp.Tracer.Thickness = 1; esp.Tracer.Transparency = 0.7
@@ -268,7 +294,6 @@ local function UpdateESP()
     for player, drawings in pairs(ESP) do
         local char = player.Character
         
-        -- Lấy các part cần thiết
         local root = char and char:FindFirstChild("HumanoidRootPart")
         local hum = char and char:FindFirstChild("Humanoid")
         local head = char and char:FindFirstChild("Head") 
@@ -345,7 +370,7 @@ local function UpdateESP()
 end
 
 -- === CONFIG SAVE/LOAD ===
-local configFile = "VanThanhPanel_v18.json" -- Cập nhật tên file
+local configFile = "VanThanhPanel_v19.json" -- Cập nhật tên file
 local function SaveConfig()
     if writefile then
         writefile(configFile, HttpService:JSONEncode(config))
@@ -380,10 +405,10 @@ end
 
 -- === GUI ===
 local Window = Rayfield:CreateWindow({
-    Name = "Van Thanh Panel v1.18",
-    LoadingTitle = "Hold-To-Aim | No Recoil",
+    Name = "Van Thanh Panel v1.19",
+    LoadingTitle = "Hold-To-Aim | No Recoil Fix",
     LoadingSubtitle = "Van Thanh >/<",
-    ConfigurationSaving = {Enabled = true, FolderName = "VanThanhPanel", FileName = "v18"}
+    ConfigurationSaving = {Enabled = true, FolderName = "VanThanhPanel", FileName = "v19"}
 })
 
 local Combat = Window:CreateTab("Combat", 4483362458)
@@ -422,16 +447,14 @@ Misc:CreateToggle({
     end
 })
 
--- Nút cũ đã bị xóa. Có thể thêm lại nút để áp dụng ngay 1 lần nếu cần.
-
 -- === CONFIG ===
 ConfigTab:CreateButton({Name = "Save Config", Callback = SaveConfig})
 ConfigTab:CreateButton({Name = "Load Config", Callback = LoadConfig})
-ConfigTab:CreateLabel("Menu Keybind: " .. config.menu.Keybind.Name) -- Hiển thị Keybind Menu
+ConfigTab:CreateLabel("Menu Keybind: " .. config.menu.Keybind.Name) 
 
 -- === CREDITS ===
 Credits:CreateLabel("Code bởi: Van Thanh >/<")
-Credits:CreateLabel("v1.18 - Keybinds + No Recoil Toggle")
+Credits:CreateLabel("v1.19 - No Recoil Fix + Keybinds")
 Credits:CreateLabel("Zalo: 0392236290")
 
 -- === LOOPS ===
@@ -458,7 +481,7 @@ players.PlayerRemoving:Connect(function(p)
     end
 end)
 
-print("Van Thanh Panel v1.18 Loaded – Hold LMB to Aim, Keybinds: R, T, F!")
+print("Van Thanh Panel v1.19 Loaded – No Recoil Fix Applied!")
 
 -- Load config khi script được tải
 LoadConfig()
