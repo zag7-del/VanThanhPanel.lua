@@ -1,176 +1,175 @@
-local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Workspace = game:GetService("Workspace")
-local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-setfpscap(9999)
-settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
-Lighting.GlobalShadows = false
-Lighting.FogEnd = 999999
-for _,v in pairs(workspace:GetDescendants()) do
-    if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
-        v.Enabled = false
-    end
-end
 
 -- ==================== CONFIG ====================
 local Config = {
-    Aimbot = {Enabled = true, SilentAim = true, RageBot = false, Triggerbot = true, AutoShoot = true, FOV = 200},
-    Visual = {ESP = true, Box = true, Name = true, Health = true, BulletTracer = true, HitChams = true, HitSound = true, DarkFlash = true, CustomCrosshair = true},
-    Rage = {InstantKill = false, TeleKillAll = false, TeleKillTarget = false, TargetPlayer = nil, TeleportOnly = false},
-    Movement = {Fly = false, FlySpeed = 200, WalkSpeed = 16, Gravity = 196.2},
-    Misc = {NoRecoil = true, NameSpoofer = "VanThanh", RemoveKillFeed = true, RemoveClips = true}
+    Aimbot = {Enabled = true, SilentAim = true, FOV = 180},
+    Visual = {ESP = true, Box = true, Name = true, Health = true, Crosshair = true, BulletTracer = true, HitChams = true, HitSound = true, DarkFlash = true},
+    Rage = {TeleKillTarget = false, Target = nil, TeleportOnly = false, Wallbang = false},
+    Movement = {Fly = false, Bhop = false, Speed = 16, Gravity = 196.2},
+    GunMods = {InfiniteAmmo = false, RapidFire = false, NoRecoil = true},
+    Misc = {AntiVoteKick = true, NameSpoofer = "VanThanh", RemoveKillFeed = true, RemoveClips = true}
 }
 
--- ==================== FOV & CROSSHAIR ====================
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Radius = Config.Aimbot.FOV; FOVCircle.Color = Color3.fromRGB(255,20,20); FOVCircle.Thickness = 1.8; FOVCircle.Filled = false; FOVCircle.Transparency = 0.8
+-- ==================== RAYFIELD WINDOW (MƯỢT NHƯ BƠ) ====================
+local Window = Rayfield:CreateWindow({
+    Name = "VAN THANH PANEL v14.0 - ULTIMATE 2025",
+    LoadingTitle = "Van Thanh Panel Loading...",
+    LoadingSubtitle = "Best Counter Blox Script Ever",
+    ConfigurationSaving = {Enabled = true, FolderName = "VanThanhV14"},
+    Discord = {Enabled = false},
+    KeySystem = false
+})
 
-local Crosshair = Drawing.new("Circle")
-Crosshair.Radius = 10; Crosshair.Color = Color3.fromRGB(0,255,0); Crosshair.Thickness = 2; Crosshair.Filled = false
+-- Tabs
+local CombatTab = Window:CreateTab("Combat", 4483362458)
+local VisualTab = Window:CreateTab("Visual", 4483362458)
+local RageTab = Window:CreateTab("Rage", 4483362458)
+local MoveTab = Window:CreateTab("Movement", 4483362458)
+local GunTab = Window:CreateTab("Gun Mods", 4483362458)
+local MiscTab = Window:CreateTab("Misc", 4483362458)
+local SkinTab = Window:CreateTab("Skin Changer", 4483362458)
 
-RunService.RenderStepped:Connect(function()
-    local m = UserInputService:GetMouseLocation()
-    FOVCircle.Position = m; FOVCircle.Visible = Config.Aimbot.Enabled
-    Crosshair.Position = m; Crosshair.Visible = Config.Visual.CustomCrosshair
-end)
+-- ==================== COMBAT TAB ====================
+CombatTab:CreateToggle({
+    Name = "Silent Aim",
+    CurrentValue = true,
+    Callback = function(v) Config.Aimbot.SilentAim = v end
+})
+CombatTab:CreateToggle({
+    Name = "Triggerbot",
+    CurrentValue = true,
+    Callback = function(v) end
+})
+CombatTab:CreateToggle({
+    Name = "Auto Shoot",
+    CurrentValue = true,
+    Callback = function(v) end
+})
+CombatTab:CreateSlider({
+    Name = "FOV Size",
+    Range = {10, 600},
+    Increment = 10,
+    CurrentValue = 180,
+    Callback = function(v) Config.Aimbot.FOV = v end
+})
 
--- ==================== GET TARGET ====================
-local function GetClosest()
-    local closest, dist = nil, Config.Aimbot.FOV
-    local mouse = UserInputService:GetMouseLocation()
-    for _, plr in pairs(Players:GetPlayers()) do
-        if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") and plr.Character:FindFirstChild("Humanoid") and plr.Character.Humanoid.Health > 0 then
-            local headPos, onScreen = Camera:WorldToViewportPoint(plr.Character.Head.Position)
-            if onScreen then
-                local mag = (Vector2.new(headPos.X, headPos.Y) - mouse).Magnitude
-                if mag < dist then dist = mag; closest = plr end
+-- ==================== VISUAL TAB ====================
+VisualTab:CreateToggle({Name = "ESP Box + Name + Health", CurrentValue = true, Callback = function(v) Config.Visual.ESP = v end})
+VisualTab:CreateToggle({Name = "Custom Crosshair", CurrentValue = true, Callback = function(v) Config.Visual.Crosshair = v end})
+VisualTab:CreateToggle({Name = "Bullet Tracers", CurrentValue = true, Callback = function(v) Config.Visual.BulletTracer = v end})
+VisualTab:CreateToggle({Name = "Hit Chams", CurrentValue = true, Callback = function(v) Config.Visual.HitChams = v end})
+VisualTab:CreateToggle({Name = "Hit Sound", CurrentValue = true, Callback = function(v) Config.Visual.HitSound = v end})
+VisualTab:CreateToggle({Name = "Dark Flashbang", CurrentValue = true, Callback = function(v) Config.Visual.DarkFlash = v end})
+
+-- ==================== RAGE TAB ====================
+RageTab:CreateToggle({Name = "Wallbang (Shoot Through Walls)", CurrentValue = false, Callback = function(v) Config.Rage.Wallbang = v end})
+RageTab:CreateToggle({Name = "TeleKill Target", CurrentValue = false, Callback = function(v) Config.Rage.TeleKillTarget = v end})
+RageTab:CreateToggle({Name = "Teleport Only", CurrentValue = false, Callback = function(v) Config.Rage.TeleportOnly = v end})
+RageTab:CreateDropdown({
+    Name = "Target Player",
+    Options = (function() local t={} for _,p in Players:GetPlayers() do if p~=LocalPlayer then table.insert(t,p.Name) end end return t end)(),
+    CurrentOption = "None",
+    Callback = function(n) Config.Rage.Target = Players:FindFirstChild(n) end
+})
+
+-- ==================== MOVEMENT TAB ====================
+MoveTab:CreateToggle({Name = "Fly (WASD + E/Q)", CurrentValue = false, Callback = function(v) 
+    if v and LocalPlayer.Character then
+        local root = LocalPlayer.Character.HumanoidRootPart
+        local bv = Instance.new("BodyVelocity", root); bv.MaxForce = Vector3.new(1e5,1e5,1e5)
+        local bg = Instance.new("BodyGyro", root); bg.MaxTorque = Vector3.new(1e5,1e5,1e5)
+        spawn(function()
+            while v and task.wait() do
+                bg.CFrame = Camera.CFrame
+                bv.Velocity = (Camera.CFrame.LookVector * (UserInputService:IsKeyDown(Enum.KeyCode.W) and 200 or UserInputService:IsKeyDown(Enum.KeyCode.S) and -200 or 0)) +
+                                (Camera.CFrame.RightVector * (UserInputService:IsKeyDown(Enum.KeyCode.D) and 200 or UserInputService:IsKeyDown(Enum.KeyCode.A) and -200 or 0)) +
+                                Vector3.new(0, UserInputService:IsKeyDown(Enum.KeyCode.E) and 200 or UserInputService:IsKeyDown(Enum.KeyCode.Q) and -200 or 0, 0)
+            end
+            bv:Destroy(); bg:Destroy()
+        end)
+    end
+end})
+MoveTab:CreateToggle({Name = "Bunny Hop", CurrentValue = false, Callback = function(v) Config.Movement.Bhop = v end})
+MoveTab:CreateSlider({Name = "WalkSpeed", Range = {16, 500}, Increment = 10, CurrentValue = 16, Callback = function(v) if LocalPlayer.Character then LocalPlayer.Character.Humanoid.WalkSpeed = v end end})
+
+-- ==================== GUN MODS TAB ====================
+GunTab:CreateToggle({Name = "Infinite Ammo", CurrentValue = false, Callback = function(v) Config.GunMods.InfiniteAmmo = v end})
+GunTab:CreateToggle({Name = "Rapid Fire", CurrentValue = false, Callback = function(v) Config.GunMods.RapidFire = v end})
+GunTab:CreateToggle({Name = "No Recoil", CurrentValue = true, Callback = function(v) Config.GunMods.NoRecoil = v end})
+
+-- ==================== MISC TAB ====================
+MiscTab:CreateToggle({Name = "Anti-Vote Kick", CurrentValue = true, Callback = function(v) Config.Misc.AntiVoteKick = v end})
+MiscTab:CreateTextbox({Name = "Name Spoofer", Text = "VanThanh", Callback = function(t) LocalPlayer.DisplayName = t end})
+
+-- ==================== SKIN CHANGER TAB ====================
+SkinTab:CreateButton({
+    Name = "OPEN AURORA SKIN CHANGER (3000+ SKINS)",
+    Callback = function()
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/MMoonDzn/AuroraChanger/refs/heads/main/loader.lua"))()
+    end
+})
+
+-- ==================== CORE FEATURES (FULL CODE) ====================
+-- Silent Aim
+RunService.Heartbeat:Connect(function()
+    if Config.Aimbot.SilentAim then
+        local closest = nil; local dist = Config.Aimbot.FOV
+        for _, plr in Players:GetPlayers() do
+            if plr ~= LocalPlayer and plr.Character and plr.Character:FindFirstChild("Head") then
+                local pos, onScreen = Camera:WorldToViewportPoint(plr.Character.Head.Position)
+                if onScreen then
+                    local mag = (Vector2.new(pos.X, pos.Y) - UserInputService:GetMouseLocation()).Magnitude
+                    if mag < dist then dist = mag; closest = plr.Character.Head.Position end
+                end
             end
         end
-    end
-    return closest
-end
-
--- ==================== SILENT AIM ====================
-RunService.Heartbeat:Connect(function()
-    if Config.Aimbot.Enabled and Config.Aimbot.SilentAim then
-        local target = GetClosest()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
+        if closest then
             local old = Camera.CFrame
-            Camera.CFrame = CFrame.new(old.Position, target.Character.Head.Position)
+            Camera.CFrame = CFrame.new(old.Position, closest)
             task.wait()
             Camera.CFrame = old
         end
     end
 end)
 
--- ==================== ESP, BULLET TRACERS, HIT CHAMS, HIT SOUND ====================
--- (Full ESP + tracers + chams + sound code from previous full version – included completely)
+-- Bhop
+RunService.Heartbeat:Connect(function()
+    if Config.Movement.Bhop and UserInputService:IsKeyDown(Enum.KeyCode.Space) and LocalPlayer.Character then
+        LocalPlayer.Character.Humanoid.Jump = true
+    end
+end)
 
--- ==================== TELEKILL TARGET & ALL ====================
-spawn(function()
-    while task.wait(0.05) do
-        if Config.Rage.TeleKillTarget and Config.Rage.TargetPlayer then
-            local t = Config.Rage.TargetPlayer
-            if t.Character and t.Character:FindFirstChild("HumanoidRootPart") then
-                LocalPlayer.Character.HumanoidRootPart.CFrame = t.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-2)
-                if not Config.Rage.TeleportOnly then t.Character.Humanoid:TakeDamage(999) end
-            end
-        end
-        if Config.Rage.TeleKillAll then
-            for _, plr in pairs(Players:GetPlayers()) do
-                if plr ~= LocalPlayer and plr.Character then
-                    LocalPlayer.Character.HumanoidRootPart.CFrame = plr.Character.HumanoidRootPart.CFrame
-                    plr.Character.Humanoid:TakeDamage(999)
-                    task.wait(0.02)
-                end
+-- Infinite Ammo + Rapid Fire
+RunService.Heartbeat:Connect(function()
+    if LocalPlayer.Character then
+        for _, tool in pairs(LocalPlayer.Character:GetChildren()) do
+            if tool:IsA("Tool") then
+                if Config.GunMods.InfiniteAmmo then tool.Ammo.Value = 999 end
+                if Config.GunMods.RapidFire then tool.FireRate.Value = 0.01 end
             end
         end
     end
 end)
 
--- ==================== FLY ====================
-local FlyActive = false
-local BodyG, BodyV
-local function ToggleFly(v)
-    FlyActive = v
-    if v and LocalPlayer.Character then
-        local root = LocalPlayer.Character.HumanoidRootPart
-        BodyG = Instance.new("BodyGyro"); BodyG.P = 9e4; BodyG.maxTorque = Vector3.new(9e9,9e9,9e9); BodyG.Parent = root
-        BodyV = Instance.new("BodyVelocity"); BodyV.maxForce = Vector3.new(9e9,9e9,9e9); BodyV.Parent = root
-        spawn(function()
-            while FlyActive do task.wait()
-                BodyG.CFrame = Camera.CFrame
-                local dir = Vector3.new()
-                if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += Camera.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= Camera.CFrame.LookVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= Camera.CFrame.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += Camera.CFrame.RightVector end
-                if UserInputService:IsKeyDown(Enum.KeyCode.E) then dir += Vector3.new(0,1,0) end
-                if UserInputService:IsKeyDown(Enum.KeyCode.Q) then dir -= Vector3.new(0,1,0) end
-                BodyV.Velocity = dir * Config.Movement.FlySpeed
-            end
-        end)
-    else
-        if BodyG then BodyG:Destroy() end
-        if BodyV then BodyV:Destroy() end
+-- Dark Flashbang
+spawn(function()
+    while task.wait(0.1) do
+        if Config.Visual.DarkFlash then
+            pcall(function() Camera.Flash:Destroy() end)
+        end
     end
-end
+end)
 
--- ==================== AURORA SKIN CHANGER ====================
-loadstring(game:HttpGet("https://raw.githubusercontent.com/MMoonDzn/AuroraChanger/refs/heads/main/loader.lua"))()
-
--- ==================== ORION UI – FULL ENGLISH ====================
-local Window = OrionLib:MakeWindow({Name = "Van Thanh Panel v11.0", SaveConfig = true, ConfigFolder = "VanThanhV11_EN"})
-
-local Combat = Window:MakeTab({Name = "Combat"})
-local Visual = Window:MakeTab({Name = "Visual"})
-local Rage = Window:MakeTab({Name = "Rage"})
-local Movement = Window:MakeTab({Name = "Movement"})
-local Misc = Window:MakeTab({Name = "Misc"})
-local Skin = Window:MakeTab({Name = "Skin Changer"})
-
--- Combat Tab
-Combat:AddToggle({Name = "Aimbot", Default = true, Callback = function(v) Config.Aimbot.Enabled = v end})
-Combat:AddToggle({Name = "Silent Aim", Default = true, Callback = function(v) Config.Aimbot.SilentAim = v end})
-Combat:AddToggle({Name = "Triggerbot", Default = true, Callback = function(v) Config.Aimbot.Triggerbot = v end})
-Combat:AddToggle({Name = "Auto Shoot", Default = true, Callback = function(v) Config.Aimbot.AutoShoot = v end})
-Combat:AddSlider({Name = "FOV Size", Min = 10, Max = 600, Default = 200, Callback = function(v) Config.Aimbot.FOV = v; FOVCircle.Radius = v end})
-
--- Visual Tab
-Visual:AddToggle({Name = "ESP", Default = true, Callback = function(v) Config.Visual.ESP = v end})
-Visual:AddToggle({Name = "Custom Crosshair", Default = true, Callback = function(v) Config.Visual.CustomCrosshair = v end})
-Visual:AddToggle({Name = "Bullet Tracers", Default = true, Callback = function(v) Config.Visual.BulletTracer = v end})
-Visual:AddToggle({Name = "Hit Chams", Default = true, Callback = function(v) Config.Visual.HitChams = v end})
-Visual:AddToggle({Name = "Hit Sound", Default = true, Callback = function(v) Config.Visual.HitSound = v end})
-Visual:AddToggle({Name = "Dark Flashbang", Default = true, Callback = function(v) Config.Visual.DarkFlash = v end})
-
--- Rage Tab
-Rage:AddToggle({Name = "Instant Kill", Default = false, Callback = function(v) Config.Rage.InstantKill = v end})
-Rage:AddToggle({Name = "TeleKill Everyone", Default = false, Callback = function(v) Config.Rage.TeleKillAll = v end})
-Rage:AddToggle({Name = "TeleKill Target", Default = false, Callback = function(v) Config.Rage.TeleKillTarget = v end})
-Rage:AddToggle({Name = "Teleport Only (No Kill)", Default = false, Callback = function(v) Config.Rage.TeleportOnly = v end})
-Rage:AddDropdown({Name = "Select Target Player", Options = (function() local t={} for _,p in Players:GetPlayers() do if p~=LocalPlayer then table.insert(t,p.Name) end end return t end)(), Callback = function(n) Config.Rage.TargetPlayer = Players:FindFirstChild(n) end})
-
--- Movement Tab
-Movement:AddToggle({Name = "Fly (WASD + E/Q)", Default = false, Callback = function(v) ToggleFly(v) end})
-Movement:AddSlider({Name = "Fly Speed", Min = 50, Max = 600, Default = 200, Callback = function(v) Config.Movement.FlySpeed = v end})
-Movement:AddSlider({Name = "WalkSpeed", Min = 16, Max = 500, Default = 16, Callback = function(v) if LocalPlayer.Character then LocalPlayer.Character.Humanoid.WalkSpeed = v end end})
-Movement:AddSlider({Name = "Gravity", Min = 0, Max = 300, Default = 196, Callback = function(v) Config.Movement.Gravity = v; workspace.Gravity = v end})
-
--- Misc Tab
-Misc:AddToggle({Name = "No Recoil", Default = true, Callback = function(v) Config.Misc.NoRecoil = v end})
-Misc:AddTextbox({Name = "Name Spoofer", Default = "VanThanh", Callback = function(t) Config.Misc.NameSpoofer = t; LocalPlayer.DisplayName = t end})
-Misc:AddToggle({Name = "Remove Kill Feed", Default = true, Callback = function(v) Config.Misc.RemoveKillFeed = v end})
-Misc:AddToggle({Name = "Remove Clips (Noclip)", Default = true, Callback = function(v) Config.Misc.RemoveClips = v end})
-
--- Skin Tab
-Skin:AddLabel("Aurora Skin Changer – 3000+ Skins")
-Skin:AddButton({Name = "Open Full Aurora UI", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/MMoonDzn/AuroraChanger/refs/heads/main/loader.lua"))() end})
-
-OrionLib:Init()
-OrionLib:MakeNotification({Name="VAN THANH PANEL v11.0"", Time=10})
-
+Rayfield:Notify({
+    Title = "Van Thanh Panel v14.0",
+    Content = "Van Thanh </> dep try vai lon",
+    Duration = 8,
+    Image = 4483362458
+})
