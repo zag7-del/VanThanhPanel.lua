@@ -1,8 +1,3 @@
--- ═══════════════════════════════════════════════════════════
---    VAN THANH PANEL v11.0 ULTIMATE - FULL ENGLISH 2025
---    100% Features | Works on Volcano / Delta / Potassium / Codex
--- ═══════════════════════════════════════════════════════════
-
 local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -11,8 +6,6 @@ local Workspace = game:GetService("Workspace")
 local Lighting = game:GetService("Lighting")
 local Camera = workspace.CurrentCamera
 local LocalPlayer = Players.LocalPlayer
-
--- ==================== PERFORMANCE BOOST ====================
 setfpscap(9999)
 settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
 Lighting.GlobalShadows = false
@@ -131,7 +124,7 @@ end
 loadstring(game:HttpGet("https://raw.githubusercontent.com/MMoonDzn/AuroraChanger/refs/heads/main/loader.lua"))()
 
 -- ==================== ORION UI – FULL ENGLISH ====================
-local Window = OrionLib:MakeWindow({Name = "Van Thanh Panel v11.0 ULTIMATE", SaveConfig = true, ConfigFolder = "VanThanhV11_EN"})
+local Window = OrionLib:MakeWindow({Name = "Van Thanh Panel v11.0", SaveConfig = true, ConfigFolder = "VanThanhV11_EN"})
 
 local Combat = Window:MakeTab({Name = "Combat"})
 local Visual = Window:MakeTab({Name = "Visual"})
@@ -179,4 +172,5 @@ Skin:AddLabel("Aurora Skin Changer – 3000+ Skins")
 Skin:AddButton({Name = "Open Full Aurora UI", Callback = function() loadstring(game:HttpGet("https://raw.githubusercontent.com/MMoonDzn/AuroraChanger/refs/heads/main/loader.lua"))() end})
 
 OrionLib:Init()
-OrionLib:MakeNotification({Name="VAN THANH PANEL v11.0", Content="Full English Version Loaded!\nYou now own Counter Blox Source 2", Time=10})
+OrionLib:MakeNotification({Name="VAN THANH PANEL v11.0"", Time=10})
+
