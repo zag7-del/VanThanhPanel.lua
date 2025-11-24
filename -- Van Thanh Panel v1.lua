@@ -1,7 +1,3 @@
--- Van Thanh Panel v1.19 (24/11/2025) - No Recoil Fix + Keybinds
--- Code bởi: Van Thanh >/< | Dựa Aurora ENG + Van Thanh Fix
--- Features: Keybinds, Hold Mouse1 to Aim, Only Enemy, Silent Aim, ESP Team Toggle, Config
-
 local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 local runService = game:GetService("RunService")
 local players = game:GetService("Players")
@@ -10,13 +6,11 @@ local localPlayer = players.LocalPlayer
 local HttpService = game:GetService("HttpService")
 local userInputService = game:GetService("UserInputService")
 local replicatedStorage = game:GetService("ReplicatedStorage")
-
--- === CONFIG ===
 local config = {
     aimbot = {
         Enabled = true,
-        HoldToAim = true,        -- Chỉ aim khi giữ chuột trái
-        SilentAim = false,       -- Bắn trúng dù tâm không nhích
+        HoldToAim = true,
+        SilentAim = false,
         Hitbox = "Head",
         Smoothing = 0.15,
         FOV = 150,
@@ -26,7 +20,7 @@ local config = {
     },
     esp = {
         Enabled = true,
-        TeamESP = false,         -- Bật để thấy đồng đội
+        TeamESP = false,
         Box = true,
         Name = true,
         Distance = true,
@@ -42,8 +36,6 @@ local config = {
         Keybind = Enum.KeyCode.RightShift
     }
 }
-
--- Mảng theo dõi các kết nối Recoil để tránh rò rỉ bộ nhớ
 local recoilConnections = {}
 
 -- === FOV CIRCLE ===
@@ -55,21 +47,21 @@ fovCircle.Color = Color3.fromRGB(255, 0, 0)
 fovCircle.Radius = config.aimbot.FOV * (config.aimbot.FOVSizePct / 100)
 fovCircle.Visible = config.aimbot.FOVVisible
 
--- === INPUT & STATE ===
+
 local mouseDown = false
 userInputService.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 then
         mouseDown = true
     end
     
-    -- KEYBINDS LOGIC
+    
     if input.UserInputType == Enum.UserInputType.Keyboard then
         -- Menu Toggle
         if input.KeyCode == config.menu.Keybind then
             Rayfield:Toggle()
         end
 
-        -- Aimbot Toggle
+     
         if input.KeyCode == config.aimbot.Keybind then
             config.aimbot.Enabled = not config.aimbot.Enabled
             Rayfield:Notify({Title = "Aimbot Keybind", Content = "Aimbot: " .. (config.aimbot.Enabled and "ON" or "OFF"), Duration = 1})
@@ -81,14 +73,14 @@ userInputService.InputBegan:Connect(function(input)
             Rayfield:Notify({Title = "ESP Keybind", Content = "ESP: " .. (config.esp.Enabled and "ON" or "OFF"), Duration = 1})
         end
 
-        -- No Recoil Toggle
+       
         if input.KeyCode == config.misc.NoRecoilKeybind then
             config.misc.NoRecoil = not config.misc.NoRecoil
-            -- Áp dụng ngay lập tức
+            
             if config.misc.NoRecoil and localPlayer.Character then
                 CheckAndApplyRecoil(localPlayer.Character)
             else
-                -- Ngắt kết nối khi tắt để tránh lỗi
+             
                 for tool, conn in pairs(recoilConnections) do
                     conn:Disconnect()
                     recoilConnections[tool] = nil
@@ -104,7 +96,6 @@ userInputService.InputEnded:Connect(function(input)
     end
 end)
 
--- === GET BEST ENEMY (ONLY) ===
 local function GetBestEnemy()
     if not config.aimbot.Enabled or (config.aimbot.HoldToAim and not mouseDown) then return nil end
 
@@ -115,7 +106,7 @@ local function GetBestEnemy()
 
     for _, player in pairs(players:GetPlayers()) do
         if player == localPlayer then continue end
-        if player.Team == localPlayer.Team then continue end  -- CHỈ ĐỊCH
+        if player.Team == localPlayer.Team then continue end
 
         local char = player.Character
         if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then continue end
@@ -406,7 +397,7 @@ end
 -- === GUI ===
 local Window = Rayfield:CreateWindow({
     Name = "Van Thanh Panel v1.19",
-    LoadingTitle = "Hold-To-Aim | No Recoil Fix",
+    LoadingTitle = "Hold-To-Aim | No recoil is being fixed",
     LoadingSubtitle = "Van Thanh >/<",
     ConfigurationSaving = {Enabled = true, FolderName = "VanThanhPanel", FileName = "v19"}
 })
@@ -428,7 +419,7 @@ Combat:CreateSlider({Name = "FOV Size %", Range = {50, 200}, Increment = 5, Curr
 
 -- === VISUALS ===
 Visuals:CreateToggle({Name = "ESP (Keybind: " .. config.esp.Keybind.Name .. ")", CurrentValue = config.esp.Enabled, Callback = function(v) config.esp.Enabled = v end})
-Visuals:CreateToggle({Name = "ESP Đồng Đội", CurrentValue = config.esp.TeamESP, Callback = function(v) config.esp.TeamESP = v end})
+Visuals:CreateToggle({Name = "ESP Teamer", CurrentValue = config.esp.TeamESP, Callback = function(v) config.esp.TeamESP = v end})
 Visuals:CreateToggle({Name = "Box", CurrentValue = config.esp.Box, Callback = function(v) config.esp.Box = v end})
 Visuals:CreateToggle({Name = "Name", CurrentValue = config.esp.Name, Callback = function(v) config.esp.Name = v end})
 Visuals:CreateToggle({Name = "Distance", CurrentValue = config.esp.Distance, Callback = function(v) config.esp.Distance = v end})
@@ -453,8 +444,8 @@ ConfigTab:CreateButton({Name = "Load Config", Callback = LoadConfig})
 ConfigTab:CreateLabel("Menu Keybind: " .. config.menu.Keybind.Name) 
 
 -- === CREDITS ===
-Credits:CreateLabel("Code bởi: Van Thanh >/<")
-Credits:CreateLabel("v1.19 - No Recoil Fix + Keybinds")
+Credits:CreateLabel("Code by: Van Thanh >/<")
+Credits:CreateLabel("v1.19 - No recoil is being fixed + New Keybind update")
 Credits:CreateLabel("Zalo: 0392236290")
 
 -- === LOOPS ===
@@ -481,7 +472,8 @@ players.PlayerRemoving:Connect(function(p)
     end
 end)
 
-print("Van Thanh Panel v1.19 Loaded – No Recoil Fix Applied!")
+print("Van Thanh Panel v1.19 Loaded")
 
 -- Load config khi script được tải
 LoadConfig()
+
